@@ -5,6 +5,11 @@ import { TopicDetailData } from "../types";
 
 const API_KEY = process.env.API_KEY || '';
 
+// Helper to check configuration
+export const isGeminiConfigured = (): boolean => {
+  return !!API_KEY && API_KEY.length > 0 && API_KEY !== "undefined";
+};
+
 // Initialize client securely
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
@@ -47,7 +52,7 @@ const cleanJSON = (text: string): string => {
 };
 
 export const generateHistoryResponse = async (prompt: string): Promise<{ text: string; imagePrompt: string }> => {
-  if (!API_KEY) return { text: "API Key is missing. Please configure it.", imagePrompt: "" };
+  if (!isGeminiConfigured()) return { text: "API Key is missing. Please configure the API_KEY environment variable in your deployment settings.", imagePrompt: "" };
   
   try {
     const response = await ai.models.generateContent({
@@ -90,7 +95,7 @@ export const generateHistoryResponse = async (prompt: string): Promise<{ text: s
 
 // Helper to get location via Google Maps Tool
 export const getTopicLocation = async (topic: string): Promise<{ name: string; googleMapsUri: string; lat?: number; lng?: number } | undefined> => {
-    if (!API_KEY) return undefined;
+    if (!isGeminiConfigured()) return undefined;
     try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
@@ -148,7 +153,7 @@ export const getTopicLocation = async (topic: string): Promise<{ name: string; g
 
 // Fetch details for a specific profile page (Text Content Only for speed)
 export const generateTopicDetails = async (topic: string): Promise<TopicDetailData | null> => {
-  if (!API_KEY) return null;
+  if (!isGeminiConfigured()) return null;
 
   try {
     const contentResponse = await ai.models.generateContent({
@@ -220,7 +225,7 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
 
 // Fetch dynamic lists (Simulating a database)
 export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TEXTS', excludeNames: string[] = []): Promise<any[]> => {
-  if (!API_KEY) return [];
+  if (!isGeminiConfigured()) return [];
 
   const excludeStr = excludeNames.length > 0 ? `Excluding these: ${excludeNames.join(', ')}.` : "";
   
@@ -299,7 +304,7 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
 let audioContext: AudioContext | null = null;
 
 export const playTextToSpeech = async (text: string): Promise<void> => {
-  if (!API_KEY) {
+  if (!isGeminiConfigured()) {
     console.error("No API Key");
     return;
   }

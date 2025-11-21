@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -10,8 +11,10 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [react()],
     define: {
-      // Polyfill process.env.API_KEY so the existing code works after build
-      'process.env.API_KEY': JSON.stringify(env.API_KEY)
+      // Polyfill process.env.API_KEY. 
+      // We check env.API_KEY first (from .env files or Netlify vars), 
+      // then process.env.API_KEY (system vars), then default to empty string.
+      'process.env.API_KEY': JSON.stringify(env.API_KEY || process.env.API_KEY || '')
     }
   };
 });

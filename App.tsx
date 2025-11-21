@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Navigation } from './components/Navigation';
 import { QuickStories } from './components/QuickStories';
@@ -5,7 +6,7 @@ import { SectionGrid } from './components/SectionGrid';
 import { AIChat } from './components/AIChat';
 import { TopicDetail } from './components/TopicDetail';
 import { AppSection, SectionItem, Story } from './types';
-import { fetchDynamicSectionData } from './services/geminiService';
+import { fetchDynamicSectionData, isGeminiConfigured } from './services/geminiService';
 
 const STORIES: Story[] = [
   { id: '1', title: 'The Churning of the Ocean', category: 'Mythology', preview: 'Devas and Asuras churn the ocean...', imageUrl: 'https://image.pollinations.ai/prompt/Samudra%20Manthan%20churning%20ocean%20milk%20hindu%20mythology%20art%20photorealistic?width=400&height=400&nologo=true' },
@@ -27,10 +28,18 @@ function App() {
   const [textsData, setTextsData] = useState<SectionItem[]>([]);
   const [isLoadingData, setIsLoadingData] = useState<boolean>(false);
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
+  const [isConfigured, setIsConfigured] = useState<boolean>(true);
+
+  // Check configuration on mount
+  useEffect(() => {
+      setIsConfigured(isGeminiConfigured());
+  }, []);
 
   // Load data when section changes if not already loaded
   useEffect(() => {
     const loadSectionData = async () => {
+      if (!isGeminiConfigured()) return;
+
       if (currentSection === AppSection.TEMPLES && templesData.length === 0) {
         setIsLoadingData(true);
         const data = await fetchDynamicSectionData('TEMPLES');
@@ -86,7 +95,7 @@ function App() {
   };
 
   const handleLoadMore = async () => {
-    if (isLoadingMore) return;
+    if (isLoadingMore || !isConfigured) return;
     setIsLoadingMore(true);
 
     let currentItems: SectionItem[] = [];
@@ -182,11 +191,11 @@ function App() {
           </div>
         );
       case AppSection.TEMPLES:
-        return <SectionGrid title="Sacred Architecture" items={templesData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.TEMPLES} />;
+        return <SectionGrid title="Sacred Architecture" items={templesData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.TEMPLES} apiKeyMissing={!isConfigured} />;
       case AppSection.GODS:
-        return <SectionGrid title="The Pantheon" items={godsData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.GODS} />;
+        return <SectionGrid title="The Pantheon" items={godsData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.GODS} apiKeyMissing={!isConfigured} />;
       case AppSection.TEXTS:
-        return <SectionGrid title="Wisdom Scrolls" items={textsData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.TEXTS} />;
+        return <SectionGrid title="Wisdom Scrolls" items={textsData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.TEXTS} apiKeyMissing={!isConfigured} />;
       case AppSection.CHAT:
         return (
             <div className="p-4 h-full">

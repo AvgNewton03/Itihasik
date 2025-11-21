@@ -1,5 +1,6 @@
+
 import React, { useEffect, useState, useRef } from 'react';
-import { generateTopicDetails, getTopicLocation, playTextToSpeech } from '../services/geminiService';
+import { generateTopicDetails, getTopicLocation, playTextToSpeech, isGeminiConfigured } from '../services/geminiService';
 import { TopicDetailData, AppSection } from '../types';
 
 interface TopicDetailProps {
@@ -22,6 +23,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [error, setError] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
+  const [configError, setConfigError] = useState(false);
 
   // Separate state for location to allow progressive loading
   const [location, setLocation] = useState<{name: string, googleMapsUri: string, lat?: number, lng?: number} | undefined>(undefined);
@@ -32,31 +34,31 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
 
   // Updated Safer Image URL Generator
   const createSafeImageUrl = (baseTerm: string, descriptors: string, seed: number): string => {
-      // Strip all non-alphanumeric characters (except spaces) to prevent URL encoding issues
       const cleanBase = baseTerm.replace(/[^a-zA-Z0-9 ]/g, "").trim();
       const cleanDesc = descriptors.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-      
-      // Simple prompt structure
       const prompt = encodeURIComponent(`${cleanBase} ${cleanDesc}`);
-      
       return `https://image.pollinations.ai/prompt/${prompt}?width=800&height=600&nologo=true&seed=${seed}`;
   };
 
   const loadData = async () => {
+    if (!isGeminiConfigured()) {
+        setConfigError(true);
+        setLoading(false);
+        return;
+    }
+
     setLoading(true);
     setError(false);
     setGalleryUrls([]);
     setLocation(undefined);
     setShowMapModal(false);
     
-    // Reset Map
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove();
       mapInstanceRef.current = null;
     }
 
     try {
-      // 1. Fetch Text Content (Fast)
       const details = await generateTopicDetails(topicName);
       
       if (!details) {
@@ -66,27 +68,13 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
       }
 
       setData(details);
-      
-      // Generate Hero Image URL immediately (Simpler prompt)
       setHeroUrl(createSafeImageUrl(topicName, "temple ancient", 999));
-
-      // 2. Stop Loading Spinner (User sees content now)
       setLoading(false);
 
-      // 3. Background Task: Generate Gallery URLs
-      let galleryTerms: string[] = [];
-      if (details.galleryPrompts && details.galleryPrompts.length > 0) {
-          galleryTerms = details.galleryPrompts;
-      } else {
-          galleryTerms = ["stone carving", "main structure", "detailed art"];
-      }
-
-      const urls = galleryTerms.map((term, i) => {
-          return createSafeImageUrl(topicName, term, i + 100);
-      });
+      let galleryTerms: string[] = details.galleryPrompts?.length > 0 ? details.galleryPrompts : ["stone carving", "main structure", "detailed art"];
+      const urls = galleryTerms.map((term, i) => createSafeImageUrl(topicName, term, i + 100));
       setGalleryUrls(urls);
 
-      // 4. Background Task: Fetch Location
       setLoadingLocation(true);
       const locData = await getTopicLocation(topicName);
       if (locData) {
@@ -106,23 +94,18 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [topicName]);
 
-  // Initialize Leaflet Map in Modal
   useEffect(() => {
     if (showMapModal && location && location.lat && location.lng && mapRef.current && !mapInstanceRef.current) {
         if (window.L) {
             try {
-                // Slight delay to allow modal DOM to render
                 setTimeout(() => {
                     if (!mapRef.current) return;
                     const map = window.L.map(mapRef.current).setView([location.lat, location.lng], 15);
-                    
                     window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                         attribution: '&copy; OpenStreetMap &copy; CARTO'
                     }).addTo(map);
-
                     const marker = window.L.marker([location.lat, location.lng]).addTo(map);
                     marker.bindPopup(`<b>${location.name}</b>`).openPopup();
-                    
                     mapInstanceRef.current = map;
                 }, 100);
             } catch (e) {
@@ -130,7 +113,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             }
         }
     }
-    
     return () => {
         if (mapInstanceRef.current) {
             mapInstanceRef.current.remove();
@@ -150,6 +132,18 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
     );
   }
 
+  if (configError) {
+      return (
+        <div className="min-h-full flex items-center justify-center bg-background">
+            <div className="p-10 text-center bg-surface border border-red-500/30 rounded-2xl max-w-md">
+                <h2 className="text-2xl font-serif text-gray-200 mb-2">Setup Required</h2>
+                <p className="text-gray-400 mb-6">Please configure the API Key in your environment to view details.</p>
+                <button onClick={onBack} className="px-6 py-2 rounded bg-primary text-slate-900 font-bold hover:bg-accent transition-colors">Return to List</button>
+            </div>
+        </div>
+      );
+  }
+
   if (error || !data) {
     return (
       <div className="min-h-full flex items-center justify-center bg-background">
@@ -167,8 +161,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
 
   return (
     <div className="min-h-full bg-background pb-20 animate-fade-in relative">
-        
-        {/* Fixed Back Button */}
         <button 
             onClick={onBack}
             className="fixed top-6 left-6 z-50 flex items-center space-x-2 px-5 py-2.5 bg-surface/70 backdrop-blur-xl border border-slate-600/50 rounded-full text-white shadow-xl hover:bg-surface/90 hover:scale-105 transition-all duration-300 group"
@@ -179,7 +171,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             <span className="font-medium tracking-wide text-sm">Back</span>
         </button>
 
-        {/* Hero Section */}
         <div className="relative h-[50vh] w-full overflow-hidden bg-slate-800">
             <img 
                 src={heroUrl} 
@@ -196,8 +187,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             <div className="absolute bottom-0 left-0 right-0 p-8 md:p-16 max-w-7xl mx-auto">
                 <h4 className="text-primary font-bold tracking-widest uppercase mb-2">{data.subtitle}</h4>
                 <h1 className="text-4xl md:text-6xl lg:text-7xl font-serif font-bold text-white mb-6 drop-shadow-2xl">{data.title}</h1>
-                
-                {/* Action Buttons */}
                 <div className="flex gap-4 flex-wrap">
                     <button 
                         onClick={() => playTextToSpeech(`${data.title}. ${data.introduction} ${data.sections?.[0]?.content || ''}`)}
@@ -208,8 +197,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                         </svg>
                         Listen to Story
                     </button>
-                    
-                    {/* Map Button - Visible Only for Temples or if Location Available */}
                     {(category === AppSection.TEMPLES || location?.lat) && (
                         <button 
                             onClick={() => location?.lat ? setShowMapModal(true) : null}
@@ -239,7 +226,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             </div>
         </div>
 
-        {/* Map Modal */}
         {showMapModal && location && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
                 <div className="bg-surface border border-slate-600 rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col h-[80vh]">
@@ -247,10 +233,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                          <h3 className="text-lg font-bold text-white flex items-center">
                              <span className="text-primary mr-2">📍</span> {location.name}
                          </h3>
-                         <button 
-                            onClick={() => setShowMapModal(false)}
-                            className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-slate-800"
-                         >
+                         <button onClick={() => setShowMapModal(false)} className="text-gray-400 hover:text-white p-1 rounded-full hover:bg-slate-800">
                              <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                              </svg>
@@ -260,12 +243,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                         <div ref={mapRef} className="absolute inset-0 z-0"></div>
                     </div>
                     <div className="p-4 bg-slate-900 border-t border-slate-700 flex justify-end">
-                         <a 
-                            href={location.googleMapsUri} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-sm text-primary hover:underline flex items-center"
-                        >
+                         <a href={location.googleMapsUri} target="_blank" rel="noreferrer" className="text-sm text-primary hover:underline flex items-center">
                              Open in Google Maps App <svg className="w-4 h-4 ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                          </a>
                     </div>
@@ -273,21 +251,12 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             </div>
         )}
 
-        {/* Content */}
         <div className="max-w-5xl mx-auto px-6 md:px-10 -mt-10 relative z-10">
-            
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column: Main Content */}
                 <div className="lg:col-span-2 space-y-8">
-                    
-                    {/* Intro Card */}
                     <div className="bg-surface border border-slate-700 rounded-2xl p-8 shadow-2xl">
-                        <p className="text-xl font-serif text-gray-200 leading-relaxed italic text-center">
-                            "{data.introduction}"
-                        </p>
+                        <p className="text-xl font-serif text-gray-200 leading-relaxed italic text-center">"{data.introduction}"</p>
                     </div>
-
-                    {/* Detail Sections */}
                     <div className="space-y-10">
                         {data.sections?.map((section, idx) => (
                             <div key={idx} className="bg-surface/30 p-6 rounded-xl border border-slate-800">
@@ -295,20 +264,14 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                                     <span className="w-8 h-1 bg-primary mr-4 rounded-full"></span>
                                     {section.title}
                                 </h2>
-                                <p className="text-gray-300 text-lg leading-relaxed whitespace-pre-line">
-                                    {section.content}
-                                </p>
+                                <p className="text-gray-300 text-lg leading-relaxed whitespace-pre-line">{section.content}</p>
                             </div>
                         ))}
                     </div>
                 </div>
-
-                {/* Right Column: Facts & Gallery */}
                 <div className="space-y-8">
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                        <h3 className="text-xl font-bold text-gold mb-4 flex items-center">
-                            <span className="text-2xl mr-2">❖</span> Did You Know?
-                        </h3>
+                        <h3 className="text-xl font-bold text-gold mb-4 flex items-center"><span className="text-2xl mr-2">❖</span> Did You Know?</h3>
                         <ul className="space-y-4">
                             {data.facts?.map((fact, i) => (
                                 <li key={i} className="flex items-start text-gray-400 text-sm leading-relaxed border-b border-slate-800/50 pb-3 last:border-0">
@@ -318,18 +281,11 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                             ))}
                         </ul>
                     </div>
-                    
-                    {/* Image Gallery Section */}
                     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
-                         <h3 className="text-xl font-bold text-gray-100 mb-4 flex items-center">
-                            <span className="text-primary mr-2">✦</span> Visual Archives
-                        </h3>
+                         <h3 className="text-xl font-bold text-gray-100 mb-4 flex items-center"><span className="text-primary mr-2">✦</span> Visual Archives</h3>
                         <div className="grid grid-cols-1 gap-4">
                             {galleryUrls.length === 0 ? (
-                                // Skeleton loading for images
-                                [1, 2, 3].map(i => (
-                                    <div key={i} className="h-48 bg-slate-800 animate-pulse rounded-lg border border-slate-700"></div>
-                                ))
+                                [1, 2, 3].map(i => (<div key={i} className="h-48 bg-slate-800 animate-pulse rounded-lg border border-slate-700"></div>))
                             ) : (
                                 galleryUrls.map((url, idx) => (
                                     <div key={idx} className="relative group overflow-hidden rounded-lg border border-slate-700 h-48 animate-fade-in">
@@ -339,7 +295,6 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                                             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                             loading="lazy"
                                             onError={(e) => {
-                                                // Fallback to placeholder if Pollinations fails
                                                 const target = e.target as HTMLImageElement;
                                                 if (!target.src.includes('placehold.co')) {
                                                    target.src = `https://placehold.co/600x400/1e293b/d97706?text=Archive+Image`;

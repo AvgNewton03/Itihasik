@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { SectionItem, AppSection } from '../types';
 
@@ -9,6 +10,7 @@ interface SectionGridProps {
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
   category?: AppSection;
+  apiKeyMissing?: boolean;
 }
 
 declare global {
@@ -24,7 +26,8 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
     isLoading,
     onLoadMore,
     isLoadingMore,
-    category
+    category,
+    apiKeyMissing
 }) => {
   const [viewType, setViewType] = useState<'GRID' | 'MAP'>('GRID');
   const mapRef = useRef<HTMLDivElement>(null);
@@ -108,6 +111,35 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
       ))}
     </>
   );
+
+  // API Key Missing State
+  if (apiKeyMissing) {
+      return (
+          <div className="p-10 max-w-4xl mx-auto mt-20 text-center">
+              <div className="bg-surface border border-red-500/30 p-8 rounded-3xl shadow-2xl">
+                  <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white mb-2">Setup Required</h2>
+                  <p className="text-gray-400 mb-6">
+                      The application requires a valid Google Gemini API Key to fetch historical data.
+                  </p>
+                  <div className="text-left bg-slate-900 p-4 rounded-lg border border-slate-700 text-sm text-gray-300 font-mono mb-6">
+                      <p className="mb-2 text-gray-500 uppercase text-xs font-bold">How to fix on Netlify:</p>
+                      <ol className="list-decimal ml-5 space-y-1">
+                          <li>Go to Site Settings &gt; Environment Variables</li>
+                          <li>Add new variable: <span className="text-primary">API_KEY</span></li>
+                          <li>Paste your Gemini API Key</li>
+                          <li>Redeploy the site</li>
+                      </ol>
+                  </div>
+                  <a href="/" className="px-6 py-2 bg-primary text-slate-900 font-bold rounded-lg hover:bg-accent transition-colors">
+                      Refresh App
+                  </a>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto pb-20">
@@ -210,7 +242,7 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
       )}
       
       {/* Load More / Empty State */}
-      {!isLoading && items.length === 0 && (
+      {!isLoading && items.length === 0 && !apiKeyMissing && (
           <div className="text-center py-20 border border-dashed border-slate-700 rounded-2xl bg-surface/30">
              <p className="text-gray-500 font-serif text-lg">The archives are silent.</p>
           </div>
