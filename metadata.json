@@ -1,0 +1,7 @@
+{
+  "name": "Itihasik",
+  "description": "An interactive journey through history, mythology, temples, and texts with AI-powered storytelling and research.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

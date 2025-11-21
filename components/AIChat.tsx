@@ -1,0 +1,181 @@
+import React, { useState, useRef, useEffect } from 'react';
+import { ChatMessage } from '../types';
+import { generateHistoryResponse, playTextToSpeech } from '../services/geminiService';
+
+interface AIChatProps {
+  initialQuery?: string;
+}
+
+interface ExtendedMessage extends ChatMessage {
+    imageUrl?: string;
+}
+
+export const AIChat: React.FC<AIChatProps> = ({ initialQuery }) => {
+  const [input, setInput] = useState(initialQuery || '');
+  const [messages, setMessages] = useState<ExtendedMessage[]>([
+    {
+      id: '1',
+      role: 'model',
+      text: 'I am Itihasik, keeper of the chronicles. Ask me about any god, temple, or event in history.',
+      timestamp: new Date()
+    }
+  ]);
+  const [isLoading, setIsLoading] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
+  useEffect(() => {
+    if (initialQuery) {
+        handleSend(initialQuery);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSend = async (queryOverride?: string) => {
+    const query = queryOverride || input;
+    if (!query.trim()) return;
+
+    const userMsg: ExtendedMessage = {
+      id: Date.now().toString(),
+      role: 'user',
+      text: query,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setIsLoading(true);
+
+    // Call AI Service
+    const { text, imagePrompt } = await generateHistoryResponse(query);
+
+    // Generate dynamic image URL if a prompt exists
+    let imageUrl = undefined;
+    if (imagePrompt) {
+        // Clean and encode the prompt for Pollinations
+        // Adding strict style modifiers to ensure "Authentic" look
+        const promptSuffix = " photorealistic, 8k, cinematic lighting, ancient india, highly detailed, sharp focus";
+        const cleanPrompt = (imagePrompt + promptSuffix).substring(0, 300); // Limit length
+        const encodedPrompt = encodeURIComponent(cleanPrompt);
+        // Add random seed to avoid cached/duplicate images for similar queries
+        imageUrl = `https://image.pollinations.ai/prompt/${encodedPrompt}?width=800&height=600&nologo=true&seed=${Math.random()}`;
+    }
+
+    const modelMsg: ExtendedMessage = {
+      id: (Date.now() + 1).toString(),
+      role: 'model',
+      text: text,
+      imageUrl: imageUrl,
+      timestamp: new Date()
+    };
+
+    setMessages(prev => [...prev, modelMsg]);
+    setIsLoading(false);
+  };
+
+  return (
+    <div className="flex flex-col h-[calc(100vh-5rem)] max-w-5xl mx-auto bg-slate-900 md:border md:border-slate-700 md:rounded-2xl overflow-hidden shadow-2xl">
+      {/* Header */}
+      <div className="bg-surface/90 backdrop-blur border-b border-slate-700 p-4 flex justify-between items-center z-10">
+        <div className="flex items-center space-x-3">
+            <div className="w-2 h-2 bg-primary rounded-full animate-pulse"></div>
+            <h3 className="font-serif text-lg font-bold text-gray-100 tracking-wide">AI Historian</h3>
+        </div>
+      </div>
+
+      {/* Messages */}
+      <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 bg-gradient-to-b from-slate-900 to-slate-900">
+        {messages.map((msg) => (
+          <div
+            key={msg.id}
+            className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
+          >
+            <div
+              className={`max-w-[90%] md:max-w-[80%] p-5 rounded-2xl shadow-lg backdrop-blur-sm ${
+                msg.role === 'user'
+                  ? 'bg-slate-800 border border-slate-600 text-gray-100 rounded-br-none'
+                  : 'bg-black/40 border border-slate-800 text-gray-200 rounded-bl-none'
+              }`}
+            >
+              {msg.role === 'model' && msg.imageUrl && (
+                  <div className="mb-4 rounded-lg overflow-hidden border border-slate-700 shadow-lg bg-slate-900 min-h-[200px]">
+                      <img 
+                        src={msg.imageUrl} 
+                        alt="Historical visualization" 
+                        className="w-full h-auto object-cover max-h-80 bg-slate-800"
+                        loading="lazy"
+                        onError={(e) => {
+                           (e.target as HTMLImageElement).style.display = 'none';
+                        }}
+                      />
+                  </div>
+              )}
+              
+              <p className="whitespace-pre-wrap text-[15px] md:text-base leading-7 font-sans font-light tracking-wide">
+                {msg.text}
+              </p>
+
+              {msg.role === 'model' && (
+                <div className="mt-4 pt-3 border-t border-white/10 flex justify-between items-center">
+                  <span className="text-[10px] text-gray-500 uppercase tracking-wider">Generated by Itihasik</span>
+                  <button
+                    onClick={() => playTextToSpeech(msg.text)}
+                    className="flex items-center text-xs text-primary font-bold hover:text-accent transition-colors px-2 py-1 rounded hover:bg-white/5"
+                  >
+                    <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                    Listen
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        
+        {isLoading && (
+            <div className="flex items-start">
+                <div className="bg-black/40 border border-slate-800 p-4 rounded-2xl rounded-bl-none shadow-sm">
+                    <div className="flex space-x-2 items-center h-6">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce"></div>
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-100"></div>
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce delay-200"></div>
+                    </div>
+                </div>
+            </div>
+        )}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input */}
+      <div className="p-4 bg-surface border-t border-slate-700">
+        <div className="flex space-x-3 relative">
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
+            placeholder="Ask about a god, temple, or era..."
+            className="flex-1 bg-slate-900 border border-slate-600 rounded-xl px-5 py-4 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary text-gray-200 placeholder-gray-500 transition-all"
+          />
+          <button
+            onClick={() => handleSend()}
+            disabled={isLoading || !input.trim()}
+            className="bg-primary hover:bg-accent text-slate-900 font-bold rounded-xl px-6 py-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg hover:shadow-orange-500/20"
+          >
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
