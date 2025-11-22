@@ -86,15 +86,18 @@ export const generateHistoryResponse = async (prompt: string): Promise<{ text: s
     };
 
   } catch (error) {
-    console.error("Gemini Text Error:", error);
-    return { text: "The archives are momentarily unreachable. Please try again.", imagePrompt: "" };
+    console.warn("Gemini Chat Error (Quota/Network):", error);
+    return { 
+        text: "The archives are experiencing high traffic (Quota Exceeded). I can currently only guide you through our preserved records in the Temples, Gods, and Texts sections.", 
+        imagePrompt: "" 
+    };
   }
 };
 
 // Improved Location Fetching - Prioritizes simple JSON retrieval over Tools for reliability
 export const getTopicLocation = async (topic: string): Promise<{ name: string; googleMapsUri: string; lat?: number; lng?: number } | undefined> => {
     // Check Fallback data first to save API calls and ensure speed
-    const knownLocation = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title.includes(topic) || topic.includes(i.title));
+    const knownLocation = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title.toLowerCase().includes(topic.toLowerCase()) || topic.toLowerCase().includes(i.title.toLowerCase()));
     if (knownLocation && knownLocation.lat) {
         return {
             name: knownLocation.title,
@@ -133,21 +136,26 @@ export const getTopicLocation = async (topic: string): Promise<{ name: string; g
 };
 
 export const generateTopicDetails = async (topic: string): Promise<TopicDetailData | null> => {
-  // Check for fallback match first if API key is missing
-  if (!isGeminiConfigured()) {
-     const fallbackItem = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title === topic);
+  // Helper for fallback data
+  const getFallback = () => {
+    const fallbackItem = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title === topic || topic.includes(i.title) || i.title.includes(topic));
      if (fallbackItem) {
          return {
              title: fallbackItem.title,
              subtitle: "Offline Archive Record",
              heroImagePrompt: fallbackItem.imageSearchTerm || fallbackItem.title,
              introduction: fallbackItem.description,
-             sections: [{ title: "Overview", content: fallbackItem.description + " (Full details require API connection.)" }],
-             facts: ["This is a cached record.", "Connect API Key for full history."],
-             galleryPrompts: [fallbackItem.title + " close up", fallbackItem.title + " wide view", fallbackItem.title + " art"]
+             sections: [{ title: "Overview", content: fallbackItem.description + "\n\n(Note: Full detailed history is currently unavailable due to high server traffic or missing API key. This is a summarized record from our local archives.)" }],
+             facts: ["This record is retrieved from local archives.", "The main knowledge library is currently busy."],
+             galleryPrompts: [fallbackItem.title + " architecture", fallbackItem.title + " close up", "Ancient India Art"]
          };
      }
      return null;
+  };
+
+  // Check for fallback match first if API key is missing
+  if (!isGeminiConfigured()) {
+     return getFallback();
   }
 
   try {
@@ -172,8 +180,9 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
     };
 
   } catch (error) {
-    console.error("Error fetching topic details", error);
-    return null;
+    console.error("Error fetching topic details (Quota/Network)", error);
+    // RETURN FALLBACK ON ERROR (QUOTA EXCEEDED)
+    return getFallback();
   }
 };
 
