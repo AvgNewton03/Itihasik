@@ -5,6 +5,29 @@ import { TopicDetailData } from "../types";
 
 const API_KEY = process.env.API_KEY || '';
 
+// --- FALLBACK DATA (Offline Mode) ---
+const FALLBACK_TEMPLES = [
+  { id: 'f1', title: 'Konark Sun Temple', description: 'The 13th-century Sun Temple at Konark, designed as a colossal chariot with 24 wheels, dedicated to the Sun God Surya.', imageSearchTerm: 'Konark Sun Temple stone wheels architecture', tags: ['Odisha', 'Sun God', 'Chariot'], lat: 19.8876, lng: 86.0945 },
+  { id: 'f2', title: 'Brihadeeswarar Temple', description: 'A masterpiece of Chola architecture in Thanjavur, featuring one of the tallest temple towers in the world.', imageSearchTerm: 'Brihadeeswarar Temple Thanjavur vimana', tags: ['Tamil Nadu', 'Chola', 'Shiva'], lat: 10.7828, lng: 79.1318 },
+  { id: 'f3', title: 'Kedarnath Temple', description: 'Located in the Himalayas, this ancient Shiva temple is one of the Chota Char Dham pilgrimage sites.', imageSearchTerm: 'Kedarnath Temple himalayas snow stone', tags: ['Himalayas', 'Shiva', 'Jyotirlinga'], lat: 30.7352, lng: 79.0669 },
+  { id: 'f4', title: 'Meenakshi Amman Temple', description: 'A historic Hindu temple located on the southern bank of the Vaigai River in the temple city of Madurai.', imageSearchTerm: 'Meenakshi Amman Temple colorful gopuram', tags: ['Madurai', 'Dravidian', 'Parvati'], lat: 9.9195, lng: 78.1193 },
+  { id: 'f5', title: 'Khajuraho Group of Monuments', description: 'Famous for their nagara-style architectural symbolism and their erotic sculptures.', imageSearchTerm: 'Khajuraho temple sculptures detailed', tags: ['Madhya Pradesh', 'Chandela', 'Art'], lat: 24.8318, lng: 79.9199 },
+  { id: 'f6', title: 'Golden Temple', description: 'The holiest Gurdwara of Sikhism, located in the city of Amritsar, Punjab, India.', imageSearchTerm: 'Golden Temple Amritsar night reflection', tags: ['Punjab', 'Sikhism', 'Gold'], lat: 31.6200, lng: 74.8765 },
+];
+
+const FALLBACK_GODS = [
+  { id: 'g1', title: 'Shiva', description: 'The Destroyer within the Trimurti, the Hindu trinity that includes Brahma and Vishnu.', imageSearchTerm: 'Lord Shiva meditation himalayas', tags: ['Trimurti', 'Destroyer', 'Yogi'], lat: 30.7352, lng: 79.0669 },
+  { id: 'g2', title: 'Vishnu', description: 'The Preserver who descends to earth as avatars to restore cosmic order.', imageSearchTerm: 'Lord Vishnu cosmic ocean serpent', tags: ['Preserver', 'Dashavatara', 'Cosmic'], lat: 0, lng: 0 },
+  { id: 'g3', title: 'Ganesha', description: 'The remover of obstacles, patron of arts and sciences, and the deva of intellect and wisdom.', imageSearchTerm: 'Ganesha elephant god intricate art', tags: ['Wisdom', 'Beginnings', 'Elephant'], lat: 19.1690, lng: 73.0085 },
+  { id: 'g4', title: 'Durga', description: 'A major form of the Hindu goddess Parvati, associated with protection, strength, motherhood.', imageSearchTerm: 'Goddess Durga lion trishul fierce', tags: ['Shakti', 'Warrior', 'Mother'], lat: 22.5726, lng: 88.3639 },
+];
+
+const FALLBACK_TEXTS = [
+  { id: 't1', title: 'The Bhagavad Gita', description: 'A 700-verse Hindu scripture that is part of the epic Mahabharata.', imageSearchTerm: 'Bhagavad Gita Krishna Arjuna chariot war', tags: ['Philosophy', 'Mahabharata', 'Krishna'], lat: 29.9695, lng: 76.8783 },
+  { id: 't2', title: 'The Rigveda', description: 'The oldest known Vedic Sanskrit text, a collection of over 1,000 hymns.', imageSearchTerm: 'Rigveda ancient palm leaf manuscript sanskrit', tags: ['Vedas', 'Hymns', 'Sanskrit'], lat: 0, lng: 0 },
+  { id: 't3', title: 'Arthashastra', description: 'An ancient Indian Sanskrit treatise on statecraft, economic policy and military strategy.', imageSearchTerm: 'Chanakya writing arthashastra ancient', tags: ['Politics', 'Chanakya', 'Economics'], lat: 25.6126, lng: 85.1588 },
+];
+
 // Helper to check configuration
 export const isGeminiConfigured = (): boolean => {
   return !!API_KEY && API_KEY.length > 0 && API_KEY !== "undefined";
@@ -13,33 +36,26 @@ export const isGeminiConfigured = (): boolean => {
 // Initialize client securely
 const ai = new GoogleGenAI({ apiKey: API_KEY });
 
-const BASE_IMAGE_PROMPT = "photorealistic, 8k, cinematic lighting, historical photography style, highly detailed, ancient india, authentic, sharp focus, masterpiece";
+const BASE_IMAGE_PROMPT = "historical, ancient india, photorealistic, 8k";
 
-// Helper to clean AI JSON output (removes markdown code blocks and finds JSON bounds)
+// Helper to clean AI JSON output
 const cleanJSON = (text: string): string => {
   if (!text) return "[]";
-  
   let cleaned = text.trim();
-  
-  // Remove markdown code blocks
   cleaned = cleaned.replace(/^```(?:json)?/i, "").replace(/```$/i, "").trim();
   
-  // Determine if we are looking for an Object or an Array
   const firstBrace = cleaned.indexOf('{');
   const firstBracket = cleaned.indexOf('[');
   
-  // If we can't find start symbols, return as is (likely to fail parse, caught in catch block)
   if (firstBrace === -1 && firstBracket === -1) return cleaned;
 
   let startIndex = -1;
   let endIndex = -1;
 
-  // If object brace comes before array bracket (or no array bracket), treat as object
   if (firstBrace !== -1 && (firstBracket === -1 || firstBrace < firstBracket)) {
       startIndex = firstBrace;
       endIndex = cleaned.lastIndexOf('}');
   } else {
-      // Treat as array
       startIndex = firstBracket;
       endIndex = cleaned.lastIndexOf(']');
   }
@@ -52,166 +68,104 @@ const cleanJSON = (text: string): string => {
 };
 
 export const generateHistoryResponse = async (prompt: string): Promise<{ text: string; imagePrompt: string }> => {
-  if (!isGeminiConfigured()) return { text: "API Key is missing. Please configure the API_KEY environment variable in your deployment settings.", imagePrompt: "" };
+  if (!isGeminiConfigured()) return { text: "API Key is missing. Please configure it to chat with the historian.", imagePrompt: "" };
   
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `You are Itihasik, a knowledgeable historian.
-      User Query: ${prompt}
-      
-      Task:
-      1. Provide a detailed, accurate, and engaging historical or mythological answer.
-      2. STRICTLY DO NOT use Markdown formatting (no bolding **, no italics _, no headers #). Write in clean, plain text paragraphs.
-      3. At the very end, output a separator "||IMG||" followed by a specific image prompt. 
-      
-      Image Prompt Rules:
-      - Describe the main subject visually.
-      - Add keywords: "photorealistic, 8k, cinematic lighting, historical photography style, highly detailed".
-      - Keep it under 15 words.
-      
-      Example Output:
-      The Konark Sun Temple is a 13th-century CE Sun Temple at Konark...
-      ||IMG|| Konark Sun Temple stone wheels architecture photorealistic 8k cinematic`,
+      contents: `User Query: ${prompt}. Answer as Itihasik, an Indian historian. Keep it under 100 words. No markdown. End with ||IMG|| followed by a 5-word visual description of the subject.`,
     });
 
     const fullText = response.text || "I could not find information on that.";
     const parts = fullText.split("||IMG||");
-    
-    // Clean up any residual markdown
-    let cleanText = parts[0].trim();
-    cleanText = cleanText.replace(/\*\*/g, "").replace(/__/g, "").replace(/^#+\s/gm, "");
+    let cleanText = parts[0].trim().replace(/\*\*/g, "").replace(/__/g, "").replace(/^#+\s/gm, "");
 
     return {
       text: cleanText,
-      imagePrompt: parts.length > 1 ? parts[1].trim() : `${prompt} ${BASE_IMAGE_PROMPT}`
+      imagePrompt: parts.length > 1 ? parts[1].trim() : `${prompt} ancient india`
     };
 
   } catch (error) {
     console.error("Gemini Text Error:", error);
-    return { text: "The archives are currently inaccessible.", imagePrompt: "" };
+    return { text: "The archives are momentarily unreachable. Please try again.", imagePrompt: "" };
   }
 };
 
-// Helper to get location via Google Maps Tool
+// Improved Location Fetching - Prioritizes simple JSON retrieval over Tools for reliability
 export const getTopicLocation = async (topic: string): Promise<{ name: string; googleMapsUri: string; lat?: number; lng?: number } | undefined> => {
+    // Check Fallback data first to save API calls and ensure speed
+    const knownLocation = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title.includes(topic) || topic.includes(i.title));
+    if (knownLocation && knownLocation.lat) {
+        return {
+            name: knownLocation.title,
+            googleMapsUri: `https://www.google.com/maps/search/?api=1&query=${knownLocation.lat},${knownLocation.lng}`,
+            lat: knownLocation.lat,
+            lng: knownLocation.lng
+        };
+    }
+
     if (!isGeminiConfigured()) return undefined;
+
     try {
+        // STRATEGY 1: Direct JSON Request (Most reliable for coordinates)
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: `Find the precise location of "${topic}". 
-            Return a JSON object with the following keys:
-            - name: The official name of the place.
-            - lat: The latitude (number).
-            - lng: The longitude (number).
-            `,
-            config: {
-                tools: [{ googleMaps: {} }],
-                responseMimeType: "application/json"
-            }
+            contents: `Return JSON only: { "lat": number, "lng": number, "placeName": string } for the exact location of "${topic}". If mythological/unknown, use the most famous temple location for it.`,
+            config: { responseMimeType: "application/json" }
         });
         
         const text = cleanJSON(response.text || "{}");
-        let data: any = {};
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.warn("JSON Parse for location failed", e);
-        }
+        const data = JSON.parse(text);
 
-        // Extract grounding chunks for URI (Source of truth for link)
-        let uri = "";
-        const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-        if (chunks && chunks.length > 0) {
-            // Look for map URIs
-            for (const chunk of chunks) {
-                if (chunk.web?.uri && chunk.web.uri.includes('google.com/maps')) {
-                     uri = chunk.web.uri;
-                     break;
-                }
-            }
-        }
-        
-        if (!uri && data.lat && data.lng) {
-            uri = `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`;
-        }
-
-        if (data.name) {
-             return { 
-                 name: data.name, 
-                 googleMapsUri: uri || '#',
-                 lat: data.lat,
-                 lng: data.lng
-             };
+        if (data.lat && data.lng) {
+            return {
+                name: data.placeName || topic,
+                googleMapsUri: `https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lng}`,
+                lat: data.lat,
+                lng: data.lng
+            };
         }
         return undefined;
     } catch (e) {
-        console.warn("Maps tool failed", e);
+        console.warn("Location fetch failed", e);
         return undefined;
     }
 };
 
-// Fetch details for a specific profile page (Text Content Only for speed)
 export const generateTopicDetails = async (topic: string): Promise<TopicDetailData | null> => {
-  if (!isGeminiConfigured()) return null;
+  // Check for fallback match first if API key is missing
+  if (!isGeminiConfigured()) {
+     const fallbackItem = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title === topic);
+     if (fallbackItem) {
+         return {
+             title: fallbackItem.title,
+             subtitle: "Offline Archive Record",
+             heroImagePrompt: fallbackItem.imageSearchTerm || fallbackItem.title,
+             introduction: fallbackItem.description,
+             sections: [{ title: "Overview", content: fallbackItem.description + " (Full details require API connection.)" }],
+             facts: ["This is a cached record.", "Connect API Key for full history."],
+             galleryPrompts: [fallbackItem.title + " close up", fallbackItem.title + " wide view", fallbackItem.title + " art"]
+         };
+     }
+     return null;
+  }
 
   try {
     const contentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Create a detailed profile for "${topic}" in the context of Indian History/Mythology.
-      Return valid JSON matching this schema.
-      Ensure "galleryPrompts" provides 3 distinct, simple, short visual descriptions for images (e.g. "stone carving detail", "main idol view", "aerial temple structure").
-      DO NOT include resolution or style keywords in galleryPrompts, just the subject.
-      `,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            subtitle: { type: Type.STRING },
-            heroImagePrompt: { type: Type.STRING },
-            introduction: { type: Type.STRING },
-            sections: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  content: { type: Type.STRING }
-                }
-              }
-            },
-            facts: {
-              type: Type.ARRAY,
-              items: { type: Type.STRING }
-            },
-            galleryPrompts: {
-                type: Type.ARRAY,
-                items: { type: Type.STRING }
-            }
-          }
-        }
-      }
+      contents: `Profile for "${topic}" (Ancient India). JSON format.
+      Fields: title, subtitle, heroImagePrompt (visual keywords only), introduction (2 sentences), sections (array of {title, content}), facts (array of strings), galleryPrompts (array of 3 visual strings).`,
+      config: { responseMimeType: "application/json" }
     });
 
     const text = cleanJSON(contentResponse.text || "");
-    if (!text || text === "{}") throw new Error("Empty response");
-
-    let parsed;
-    try {
-      parsed = JSON.parse(text);
-    } catch (e) {
-      console.warn("JSON Parse failed", e);
-      console.warn("Raw text was:", text);
-      throw new Error("Invalid JSON format");
-    }
+    const parsed = JSON.parse(text);
 
     return {
         title: parsed.title || topic,
         subtitle: parsed.subtitle || "Historical Entity",
-        heroImagePrompt: parsed.heroImagePrompt || `${topic} authentic historical ancient india`,
-        introduction: parsed.introduction || "Information currently unavailable.",
+        heroImagePrompt: parsed.heroImagePrompt || `${topic} ancient`,
+        introduction: parsed.introduction || "Details unavailable.",
         sections: Array.isArray(parsed.sections) ? parsed.sections : [],
         facts: Array.isArray(parsed.facts) ? parsed.facts : [],
         galleryPrompts: Array.isArray(parsed.galleryPrompts) ? parsed.galleryPrompts : [],
@@ -223,72 +177,41 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
   }
 };
 
-// Fetch dynamic lists (Simulating a database)
 export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TEXTS', excludeNames: string[] = []): Promise<any[]> => {
-  if (!isGeminiConfigured()) return [];
+  // 1. If API is missing, return static fallback data immediately.
+  if (!isGeminiConfigured()) {
+      console.log("Using Fallback Data (No API Key)");
+      const dataMap = { 'TEMPLES': FALLBACK_TEMPLES, 'GODS': FALLBACK_GODS, 'TEXTS': FALLBACK_TEXTS };
+      const allItems = dataMap[category];
+      // Filter out excluded
+      const newItems = allItems.filter(i => !excludeNames.includes(i.title));
+      
+      return newItems.map(item => ({
+          ...item,
+          imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent((item.imageSearchTerm || item.title) + " " + BASE_IMAGE_PROMPT)}?width=600&height=400&nologo=true&seed=${item.id}`
+      }));
+  }
 
-  const excludeStr = excludeNames.length > 0 ? `Excluding these: ${excludeNames.join(', ')}.` : "";
-  
-  const prompts = {
-    TEMPLES: `List 12 significant, visually stunning ancient temples of India. ${excludeStr} Return JSON array. Include approximate lat/lng coordinates for mapping.`,
-    GODS: `List 12 major/minor Hindu deities. ${excludeStr} Return JSON array. For 'lat' and 'lng', provide coordinates of a famous temple dedicated to them (if applicable, else 0).`,
-    TEXTS: `List 12 ancient Indian texts. ${excludeStr} Return JSON array. For 'lat' and 'lng', provide coordinates of where it was written or found (approximate).`
-  };
-
+  // 2. Attempt to fetch from API
   try {
+    const excludeStr = excludeNames.length > 0 ? `Exclude: ${excludeNames.join(', ')}.` : "";
+    const prompts = {
+      TEMPLES: `List 6 famous ancient Indian temples. ${excludeStr} JSON Array. Fields: id, title, description, imageSearchTerm (visual keywords), tags, lat, lng.`,
+      GODS: `List 6 Hindu gods/goddesses. ${excludeStr} JSON Array. Fields: id, title, description, imageSearchTerm, tags, lat (of main temple), lng.`,
+      TEXTS: `List 6 ancient Indian texts. ${excludeStr} JSON Array. Fields: id, title, description, imageSearchTerm, tags, lat (origin/museum), lng.`
+    };
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: prompts[category],
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              id: { type: Type.STRING },
-              title: { type: Type.STRING },
-              description: { type: Type.STRING },
-              imageSearchTerm: { type: Type.STRING, description: "2-3 words search term for photo" },
-              tags: { type: Type.ARRAY, items: { type: Type.STRING } },
-              lat: { type: Type.NUMBER, description: "Latitude coordinate" },
-              lng: { type: Type.NUMBER, description: "Longitude coordinate" }
-            }
-          }
-        }
-      }
+      config: { responseMimeType: "application/json" }
     });
 
     let cleanedText = cleanJSON(response.text || "[]");
-    let data;
+    let data = JSON.parse(cleanedText);
     
-    try {
-        data = JSON.parse(cleanedText);
-    } catch (e) {
-        console.warn("First parse attempt failed, retrying loose parse logic");
-        const start = response.text?.indexOf('[');
-        const end = response.text?.lastIndexOf(']');
-        if (start !== undefined && start !== -1 && end !== undefined && end !== -1) {
-            try {
-                data = JSON.parse(response.text!.substring(start, end + 1));
-            } catch (e2) {
-                console.error("Fatal JSON Parse Error in Section Data", e2);
-                return [];
-            }
-        } else {
-             return [];
-        }
-    }
-    
-    if (!Array.isArray(data)) {
-        if (data && Array.isArray(data.items)) {
-            data = data.items;
-        } else if (data && typeof data === 'object') {
-             data = [data];
-        } else {
-            return [];
-        }
-    }
+    if (!Array.isArray(data) && data.items) data = data.items;
+    if (!Array.isArray(data)) data = [];
     
     return data.map((item: any) => ({
       ...item,
@@ -296,48 +219,42 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
     }));
 
   } catch (error) {
-    console.error("Error fetching section data", error);
-    return [];
+    console.warn("API Fetch failed, using fallback data", error);
+    // 3. If API fails (Quota/Network), Return Fallback Data silently so user sees content
+    const dataMap = { 'TEMPLES': FALLBACK_TEMPLES, 'GODS': FALLBACK_GODS, 'TEXTS': FALLBACK_TEXTS };
+    const fallbackItems = dataMap[category].filter(i => !excludeNames.includes(i.title));
+    
+    return fallbackItems.map(item => ({
+          ...item,
+          imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent((item.imageSearchTerm || item.title) + " " + BASE_IMAGE_PROMPT)}?width=600&height=400&nologo=true&seed=${item.id}`
+    }));
   }
 }
 
 let audioContext: AudioContext | null = null;
 
 export const playTextToSpeech = async (text: string): Promise<void> => {
-  if (!isGeminiConfigured()) {
-    console.error("No API Key");
-    return;
-  }
+  if (!isGeminiConfigured()) return;
 
   if (audioContext) {
-      try {
-          await audioContext.close();
-      } catch (e) {}
+      try { await audioContext.close(); } catch (e) {}
       audioContext = null;
   }
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text.substring(0, 800) }] }],
+      contents: [{ parts: [{ text: text.substring(0, 400) }] }], // Limit length for reliability
       config: {
         responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: 'Fenrir' },
-          },
-        },
+        speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
       },
     });
 
     const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    
-    if (!base64Audio) {
-      throw new Error("No audio data received");
-    }
+    if (!base64Audio) throw new Error("No audio data");
 
     audioContext = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-    
     const audioBytes = decodeBase64(base64Audio);
     const validBuffer = await decodeAudioData(audioBytes, audioContext, 24000, 1);
 

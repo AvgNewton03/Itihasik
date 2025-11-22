@@ -23,30 +23,21 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
   const [galleryUrls, setGalleryUrls] = useState<string[]>([]);
   const [error, setError] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
-  const [configError, setConfigError] = useState(false);
-
-  // Separate state for location to allow progressive loading
+  
+  // Location state
   const [location, setLocation] = useState<{name: string, googleMapsUri: string, lat?: number, lng?: number} | undefined>(undefined);
   const [loadingLocation, setLoadingLocation] = useState(false);
 
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
-  // Updated Safer Image URL Generator
-  const createSafeImageUrl = (baseTerm: string, descriptors: string, seed: number): string => {
-      const cleanBase = baseTerm.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-      const cleanDesc = descriptors.replace(/[^a-zA-Z0-9 ]/g, "").trim();
-      const prompt = encodeURIComponent(`${cleanBase} ${cleanDesc}`);
-      return `https://image.pollinations.ai/prompt/${prompt}?width=800&height=600&nologo=true&seed=${seed}`;
+  // Simple URL generator
+  const createSafeImageUrl = (term: string, seed: number): string => {
+      const cleanTerm = term.replace(/[^a-zA-Z0-9 ]/g, "").substring(0, 100);
+      return `https://image.pollinations.ai/prompt/${encodeURIComponent(cleanTerm + " ancient india photorealistic")}?width=800&height=600&nologo=true&seed=${seed}`;
   };
 
   const loadData = async () => {
-    if (!isGeminiConfigured()) {
-        setConfigError(true);
-        setLoading(false);
-        return;
-    }
-
     setLoading(true);
     setError(false);
     setGalleryUrls([]);
@@ -62,19 +53,22 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
       const details = await generateTopicDetails(topicName);
       
       if (!details) {
+          // If even fallback fails
           setError(true);
           setLoading(false);
           return;
       }
 
       setData(details);
-      setHeroUrl(createSafeImageUrl(topicName, "temple ancient", 999));
+      setHeroUrl(createSafeImageUrl(details.heroImagePrompt || topicName, 999));
       setLoading(false);
 
-      let galleryTerms: string[] = details.galleryPrompts?.length > 0 ? details.galleryPrompts : ["stone carving", "main structure", "detailed art"];
-      const urls = galleryTerms.map((term, i) => createSafeImageUrl(topicName, term, i + 100));
+      // Generate gallery images
+      let galleryTerms: string[] = details.galleryPrompts?.length > 0 ? details.galleryPrompts : ["detailed close up", "architectural view", "artistic representation"];
+      const urls = galleryTerms.map((term, i) => createSafeImageUrl(term, i + 100));
       setGalleryUrls(urls);
 
+      // Fetch Location in background
       setLoadingLocation(true);
       const locData = await getTopicLocation(topicName);
       if (locData) {
@@ -100,11 +94,11 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             try {
                 setTimeout(() => {
                     if (!mapRef.current) return;
-                    const map = window.L.map(mapRef.current).setView([location.lat, location.lng], 15);
+                    const map = window.L.map(mapRef.current).setView([location.lat!, location.lng!], 15);
                     window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                         attribution: '&copy; OpenStreetMap &copy; CARTO'
                     }).addTo(map);
-                    const marker = window.L.marker([location.lat, location.lng]).addTo(map);
+                    const marker = window.L.marker([location.lat!, location.lng!]).addTo(map);
                     marker.bindPopup(`<b>${location.name}</b>`).openPopup();
                     mapInstanceRef.current = map;
                 }, 100);
@@ -132,28 +126,13 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
     );
   }
 
-  if (configError) {
-      return (
-        <div className="min-h-full flex items-center justify-center bg-background">
-            <div className="p-10 text-center bg-surface border border-red-500/30 rounded-2xl max-w-md">
-                <h2 className="text-2xl font-serif text-gray-200 mb-2">Setup Required</h2>
-                <p className="text-gray-400 mb-6">Please configure the API Key in your environment to view details.</p>
-                <button onClick={onBack} className="px-6 py-2 rounded bg-primary text-slate-900 font-bold hover:bg-accent transition-colors">Return to List</button>
-            </div>
-        </div>
-      );
-  }
-
   if (error || !data) {
     return (
       <div className="min-h-full flex items-center justify-center bg-background">
           <div className="p-10 text-center bg-surface border border-slate-700 rounded-2xl max-w-md">
-            <h2 className="text-2xl font-serif text-gray-200 mb-2">Archives unavailable</h2>
-            <p className="text-gray-400 mb-6">The records for "{topicName}" could not be retrieved at this moment.</p>
-            <div className="flex gap-4 justify-center">
-                <button onClick={onBack} className="px-4 py-2 rounded text-sm font-bold text-gray-400 hover:text-white hover:bg-white/10 transition-colors">Return to List</button>
-                <button onClick={loadData} className="px-6 py-2 rounded bg-primary text-slate-900 font-bold hover:bg-accent transition-colors shadow-lg">Try Again</button>
-            </div>
+            <h2 className="text-2xl font-serif text-gray-200 mb-2">Record Unavailable</h2>
+            <p className="text-gray-400 mb-6">We could not retrieve details for "{topicName}".</p>
+            <button onClick={onBack} className="px-6 py-2 rounded bg-primary text-slate-900 font-bold hover:bg-accent transition-colors">Return to List</button>
           </div>
       </div>
     );
@@ -190,38 +169,38 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                 <div className="flex gap-4 flex-wrap">
                     <button 
                         onClick={() => playTextToSpeech(`${data.title}. ${data.introduction} ${data.sections?.[0]?.content || ''}`)}
-                        className="flex items-center px-6 py-3 bg-primary text-slate-900 font-bold rounded-lg hover:bg-accent transition-colors shadow-lg"
+                        className="flex items-center px-6 py-3 bg-primary text-slate-900 font-bold rounded-lg hover:bg-accent transition-colors shadow-lg disabled:opacity-50"
                     >
                         <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
                         </svg>
                         Listen to Story
                     </button>
-                    {(category === AppSection.TEMPLES || location?.lat) && (
-                        <button 
-                            onClick={() => location?.lat ? setShowMapModal(true) : null}
-                            disabled={loadingLocation || !location?.lat}
-                            className={`flex items-center px-6 py-3 border border-slate-600 rounded-lg font-bold transition-colors shadow-lg
-                                ${loadingLocation || !location?.lat 
-                                    ? 'bg-surface/50 text-gray-500 cursor-not-allowed' 
-                                    : 'bg-surface text-gray-200 hover:border-primary hover:text-primary'}`}
-                        >
-                             {loadingLocation ? (
-                                 <>
-                                    <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></span>
-                                    Locating...
-                                 </>
-                             ) : (
-                                 <>
-                                     <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    </svg>
-                                    Interactive Map
-                                 </>
-                             )}
-                        </button>
-                    )}
+                    
+                    {/* Map Button - Now enabled more often due to fallback location logic */}
+                    <button 
+                        onClick={() => location?.lat ? setShowMapModal(true) : null}
+                        disabled={loadingLocation || !location?.lat}
+                        className={`flex items-center px-6 py-3 border border-slate-600 rounded-lg font-bold transition-colors shadow-lg
+                            ${loadingLocation || !location?.lat 
+                                ? 'bg-surface/50 text-gray-500 cursor-not-allowed' 
+                                : 'bg-surface text-gray-200 hover:border-primary hover:text-primary'}`}
+                    >
+                         {loadingLocation ? (
+                             <>
+                                <span className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin mr-2"></span>
+                                Locating...
+                             </>
+                         ) : (
+                             <>
+                                 <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {location?.lat ? "View on Map" : "Location Unknown"}
+                             </>
+                         )}
+                    </button>
                 </div>
             </div>
         </div>
