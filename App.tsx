@@ -35,14 +35,26 @@ function App() {
 
   // Cursor Effect
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
+    const updateCursor = (x: number, y: number) => {
       if (cursorRef.current) {
-        cursorRef.current.style.left = `${e.clientX}px`;
-        cursorRef.current.style.top = `${e.clientY}px`;
+        cursorRef.current.style.left = `${x}px`;
+        cursorRef.current.style.top = `${y}px`;
       }
     };
+
+    const handleMouseMove = (e: MouseEvent) => updateCursor(e.clientX, e.clientY);
+    const handleTouchMove = (e: TouchEvent) => {
+        if (e.touches.length > 0) {
+            updateCursor(e.touches[0].clientX, e.touches[0].clientY);
+        }
+    };
+
     window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
+    window.addEventListener('touchmove', handleTouchMove);
+    return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('touchmove', handleTouchMove);
+    };
   }, []);
 
   // Check configuration on mount
@@ -161,7 +173,7 @@ function App() {
     switch (currentSection) {
       case AppSection.HOME:
         return (
-          <div className="p-6 md:p-10 space-y-12 max-w-7xl mx-auto">
+          <div className="p-6 md:p-10 space-y-8 md:space-y-12 max-w-7xl mx-auto pb-24">
             {/* Hero Section */}
             <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[500px] group border border-white/10">
               <img 
@@ -169,25 +181,28 @@ function App() {
                 alt="Hero" 
                 className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent flex flex-col justify-end items-start p-10 md:p-16">
-                <h1 className="text-5xl md:text-7xl font-serif font-bold text-white mb-6 drop-shadow-lg tracking-tight">
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/60 to-transparent flex flex-col justify-end items-start p-8 md:p-16">
+                <h1 className="text-4xl md:text-7xl font-serif font-bold text-white mb-4 md:mb-6 drop-shadow-lg tracking-tight">
                   Unveil the <span className="text-primary">Timeless</span>
                 </h1>
-                <p className="text-xl text-gray-200 max-w-2xl drop-shadow-md mb-8 font-light leading-relaxed">
+                <p className="text-lg md:text-xl text-gray-200 max-w-2xl drop-shadow-md mb-6 md:mb-8 font-light leading-relaxed">
                   Journey through the annals of history. Explore the divine architecture, forgotten deities, and sacred scriptures of India with AI-powered storytelling.
                 </p>
                 <button 
                   onClick={() => handleSectionChange(AppSection.CHAT)}
-                  className="px-8 py-4 bg-primary text-slate-900 font-bold rounded-xl hover:bg-accent transition-all shadow-[0_0_20px_rgba(217,119,6,0.4)] hover:shadow-[0_0_30px_rgba(217,119,6,0.6)] flex items-center gap-2"
+                  className="w-full md:w-auto px-8 py-4 bg-primary text-slate-900 font-bold rounded-xl hover:bg-accent transition-all shadow-[0_0_20px_rgba(217,119,6,0.4)] hover:shadow-[0_0_30px_rgba(217,119,6,0.6)] flex items-center justify-center gap-2"
                 >
                   Start Your Quest 
                   <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
                 </button>
               </div>
             </div>
+
+             {/* Mobile Chronicles Strip */}
+            <QuickStories stories={STORIES} onReadStory={handleReadStory} variant="horizontal" />
             
             {/* Feature Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
               <div onClick={() => handleSectionChange(AppSection.TEMPLES)} className="glass-card p-8 rounded-2xl cursor-pointer hover:border-primary/50 hover:-translate-y-2 transition-all duration-300 group">
                 <div className="w-14 h-14 bg-slate-900/50 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors border border-white/5">
                   <span className="text-3xl group-hover:scale-110 transition-transform">🛕</span>
@@ -231,7 +246,7 @@ function App() {
 
   return (
     <div className="flex flex-col h-screen bg-background font-sans text-gray-200 overflow-hidden relative">
-      <div ref={cursorRef} className="cursor-glow hidden md:block" />
+      <div ref={cursorRef} className="cursor-glow block" />
 
       {showNav && (
         <Navigation 
@@ -246,9 +261,9 @@ function App() {
            {renderContent()}
         </div>
 
-        {/* Right Sidebar - Quick Stories (Hidden in Detail View and Chat) */}
+        {/* Right Sidebar - Desktop Only */}
         {showNav && viewMode === 'LIST' && (
-             <QuickStories stories={STORIES} onReadStory={handleReadStory} />
+             <QuickStories stories={STORIES} onReadStory={handleReadStory} variant="sidebar" />
         )}
       </main>
     </div>

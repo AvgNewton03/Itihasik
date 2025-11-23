@@ -108,7 +108,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
       setIsPlaying(false);
   };
 
-  // Map Init Effect (omitted for brevity, unchanged logic)
+  // Map Init Effect
   useEffect(() => {
     if (showMapModal && location && location.lat && location.lng && mapRef.current && !mapInstanceRef.current) {
         if (window.L) {
@@ -167,25 +167,25 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
             </svg>
-            <span className="font-medium tracking-wide text-sm">Back</span>
+            <span className="font-medium tracking-wide text-sm hidden md:inline">Back</span>
         </button>
 
-        <div className="relative h-[60vh] w-full overflow-hidden">
+        <div className="relative h-[65vh] w-full overflow-hidden">
             <img 
                 src={heroUrl} 
                 alt={data.title} 
                 className="w-full h-full object-cover"
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/80 to-transparent"></div>
-            <div className="absolute bottom-0 left-0 right-0 p-8 md:p-16 max-w-7xl mx-auto">
-                <h4 className="text-primary font-bold tracking-widest uppercase mb-2 drop-shadow-md">{data.subtitle}</h4>
-                <h1 className="text-4xl md:text-7xl font-serif font-bold text-white mb-8 drop-shadow-2xl">{data.title}</h1>
-                <div className="flex gap-4 flex-wrap">
+            <div className="absolute bottom-0 left-0 right-0 p-6 md:p-16 max-w-7xl mx-auto pb-28 md:pb-16">
+                <h4 className="text-primary font-bold tracking-widest uppercase mb-2 drop-shadow-md text-sm md:text-base">{data.subtitle}</h4>
+                <h1 className="text-3xl md:text-7xl font-serif font-bold text-white mb-6 drop-shadow-2xl leading-tight">{data.title}</h1>
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-6">
                     
                     {isPlaying ? (
                         <button 
                             onClick={handleStopAudio}
-                            className="flex items-center px-6 py-3 bg-red-500/20 text-red-100 border border-red-500/30 rounded-full hover:bg-red-500/30 transition-colors shadow-lg backdrop-blur-md"
+                            className="flex items-center justify-center px-6 py-3 bg-red-500/20 text-red-100 border border-red-500/30 rounded-full hover:bg-red-500/30 transition-colors shadow-lg backdrop-blur-md w-full sm:w-auto"
                         >
                             <svg className="w-5 h-5 mr-2 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -196,7 +196,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                     ) : (
                         <button 
                             onClick={handlePlayAudio}
-                            className="flex items-center px-6 py-3 bg-primary/90 text-slate-900 font-bold rounded-full hover:bg-accent transition-colors shadow-[0_0_20px_rgba(217,119,6,0.3)] backdrop-blur-md"
+                            className="flex items-center justify-center px-6 py-3 bg-primary/90 text-slate-900 font-bold rounded-full hover:bg-accent transition-colors shadow-[0_0_20px_rgba(217,119,6,0.3)] backdrop-blur-md w-full sm:w-auto"
                         >
                             <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
@@ -208,7 +208,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                     <button 
                         onClick={() => location?.lat ? setShowMapModal(true) : null}
                         disabled={loadingLocation || !location?.lat}
-                        className={`flex items-center px-6 py-3 border border-white/20 rounded-full font-bold transition-all shadow-lg backdrop-blur-md
+                        className={`flex items-center justify-center px-6 py-3 border border-white/20 rounded-full font-bold transition-all shadow-lg backdrop-blur-md w-full sm:w-auto
                             ${loadingLocation || !location?.lat 
                                 ? 'bg-white/5 text-gray-500 cursor-not-allowed' 
                                 : 'bg-white/10 text-gray-200 hover:bg-white/20 hover:text-white'}`}
@@ -232,10 +232,10 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
             </div>
         </div>
 
-        {/* Modal Logic Unchanged */}
+        {/* Modal Logic */}
         {showMapModal && location && (
             <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
-                <div className="glass-panel rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col h-[80vh]">
+                <div className="glass-panel rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl flex flex-col h-[70vh] md:h-[80vh]">
                     <div className="p-4 border-b border-white/10 flex justify-between items-center bg-slate-900/80">
                          <h3 className="text-lg font-bold text-white flex items-center">
                              <span className="text-primary mr-2">📍</span> {location.name}
@@ -261,7 +261,7 @@ export const TopicDetail: React.FC<TopicDetailProps> = ({ topicName, onBack, cat
                     </div>
                     <div className="space-y-6">
                         {data.sections?.map((section, idx) => (
-                            <div key={idx} className="bg-slate-900/40 backdrop-blur-md p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
+                            <div key={idx} className="bg-slate-900/40 backdrop-blur-md p-6 md:p-8 rounded-2xl border border-white/5 hover:border-white/10 transition-colors">
                                 <h2 className="text-2xl font-serif font-bold text-primary mb-4 flex items-center">
                                     <span className="w-10 h-0.5 bg-primary mr-4 opacity-50"></span>
                                     {section.title}
