@@ -33,28 +33,22 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
 
-  // Reset to Grid if category changes (e.g. from Temples to Gods)
   useEffect(() => {
       if (category !== AppSection.TEMPLES) {
           setViewType('GRID');
       }
   }, [category]);
 
-  // Initialize Map when viewType changes to MAP
   useEffect(() => {
       if (viewType === 'MAP' && !isLoading && items.length > 0 && mapRef.current) {
           if (!mapInstanceRef.current && window.L) {
-              // Create map
-              const map = window.L.map(mapRef.current).setView([20.5937, 78.9629], 5); // Center of India
-              
-              // Dark theme map tiles
+              const map = window.L.map(mapRef.current).setView([20.5937, 78.9629], 5);
               window.L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-                  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+                  attribution: '&copy; OpenStreetMap &copy; CARTO',
                   subdomains: 'abcd',
                   maxZoom: 20
               }).addTo(map);
 
-              // Add markers
               const markers: any[] = [];
               items.forEach(item => {
                   if (item.lat && item.lng) {
@@ -78,17 +72,13 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
                   }
               });
 
-              // Fit bounds if markers exist
               if (markers.length > 0) {
                   const group = window.L.featureGroup(markers);
                   map.fitBounds(group.getBounds(), { padding: [50, 50] });
               }
-
               mapInstanceRef.current = map;
           }
       }
-
-      // Cleanup
       return () => {
           if (viewType === 'GRID' && mapInstanceRef.current) {
               mapInstanceRef.current.remove();
@@ -100,42 +90,28 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
   const renderSkeleton = (count = 6) => (
     <>
       {Array.from({ length: count }).map((_, i) => (
-        <div key={i} className="bg-surface rounded-xl overflow-hidden animate-pulse border border-slate-700">
-          <div className="h-64 bg-slate-800"></div>
+        <div key={i} className="bg-white/5 rounded-xl overflow-hidden animate-pulse border border-white/5">
+          <div className="h-64 bg-white/10"></div>
           <div className="p-6 space-y-4">
-            <div className="h-6 bg-slate-800 rounded w-3/4"></div>
-            <div className="h-4 bg-slate-800 rounded w-full"></div>
-            <div className="h-4 bg-slate-800 rounded w-1/2"></div>
+            <div className="h-6 bg-white/10 rounded w-3/4"></div>
+            <div className="h-4 bg-white/10 rounded w-full"></div>
+            <div className="h-4 bg-white/10 rounded w-1/2"></div>
           </div>
         </div>
       ))}
     </>
   );
 
-  // API Key Missing State
   if (apiKeyMissing) {
       return (
           <div className="p-10 max-w-4xl mx-auto mt-20 text-center">
-              <div className="bg-surface border border-red-500/30 p-8 rounded-3xl shadow-2xl">
+              <div className="glass-panel border border-red-500/30 p-8 rounded-3xl shadow-2xl">
                   <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                       <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
                   </div>
                   <h2 className="text-2xl font-bold text-white mb-2">Setup Required</h2>
-                  <p className="text-gray-400 mb-6">
-                      The application requires a valid Google Gemini API Key to fetch historical data.
-                  </p>
-                  <div className="text-left bg-slate-900 p-4 rounded-lg border border-slate-700 text-sm text-gray-300 font-mono mb-6">
-                      <p className="mb-2 text-gray-500 uppercase text-xs font-bold">How to fix on Netlify:</p>
-                      <ol className="list-decimal ml-5 space-y-1">
-                          <li>Go to Site Settings &gt; Environment Variables</li>
-                          <li>Add new variable: <span className="text-primary">API_KEY</span></li>
-                          <li>Paste your Gemini API Key</li>
-                          <li>Redeploy the site</li>
-                      </ol>
-                  </div>
-                  <a href="/" className="px-6 py-2 bg-primary text-slate-900 font-bold rounded-lg hover:bg-accent transition-colors">
-                      Refresh App
-                  </a>
+                  <p className="text-gray-400 mb-6">Gemini API Key missing.</p>
+                  <a href="/" className="px-6 py-2 bg-primary text-slate-900 font-bold rounded-lg hover:bg-accent transition-colors">Refresh App</a>
               </div>
           </div>
       );
@@ -143,7 +119,7 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
 
   return (
     <div className="p-6 md:p-10 max-w-7xl mx-auto pb-20">
-      <div className="mb-12 flex flex-col md:flex-row justify-between items-end md:items-center border-b border-slate-800 pb-6">
+      <div className="mb-12 flex flex-col md:flex-row justify-between items-end md:items-center border-b border-white/10 pb-6">
         <div>
             <h2 className="text-4xl md:text-5xl font-serif font-bold text-gray-100 mb-2 tracking-tight">{title}</h2>
             <p className="text-text-muted text-sm uppercase tracking-widest">
@@ -151,9 +127,8 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
             </p>
         </div>
         
-        {/* View Toggles - ONLY VISIBLE FOR TEMPLES */}
         {!isLoading && items.length > 0 && category === AppSection.TEMPLES && (
-            <div className="flex space-x-2 bg-surface p-1 rounded-lg border border-slate-700 mt-4 md:mt-0">
+            <div className="flex space-x-2 bg-slate-900/50 p-1 rounded-lg border border-white/10 mt-4 md:mt-0 backdrop-blur-md">
                 <button 
                     onClick={() => setViewType('GRID')}
                     className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${viewType === 'GRID' ? 'bg-primary text-slate-900 shadow-lg' : 'text-gray-400 hover:text-white'}`}
@@ -176,15 +151,14 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
               <div 
                 key={item.id}
                 onClick={() => onItemClick(item)}
-                className="group relative bg-surface rounded-xl overflow-hidden cursor-pointer transition-all duration-500 hover:-translate-y-2 border border-slate-700 shadow-xl"
+                className="group relative glass-card rounded-2xl overflow-hidden cursor-pointer transition-all duration-500 hover:-translate-y-2 hover:border-primary/50 shadow-lg"
               >
-                {/* Image Container */}
                 <div className="relative h-64 overflow-hidden bg-slate-800">
                   <img 
                     src={item.imageUrl} 
                     alt={item.title} 
                     loading="lazy"
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale-[20%] group-hover:grayscale-0"
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 grayscale-[10%] group-hover:grayscale-0"
                     onError={(e) => {
                        const target = e.target as HTMLImageElement;
                        if (!target.src.includes('placehold.co')) {
@@ -194,7 +168,6 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent opacity-90"></div>
                   
-                  {/* Overlay Text */}
                   <div className="absolute bottom-0 left-0 right-0 p-6">
                       <div className="flex flex-wrap gap-2 mb-2 opacity-0 transform translate-y-4 group-hover:opacity-100 group-hover:translate-y-0 transition-all duration-300">
                           {item.tags.map(tag => (
@@ -209,7 +182,7 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
                   </div>
                 </div>
                 
-                <div className="p-6 border-t border-slate-700 bg-surface">
+                <div className="p-6 border-t border-white/5 bg-slate-900/40">
                   <p className="text-gray-400 text-sm line-clamp-3 leading-relaxed font-light">
                     {item.description}
                   </p>
@@ -217,12 +190,6 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
                       <div className="flex items-center text-primary text-xs font-bold tracking-widest uppercase opacity-60 group-hover:opacity-100 transition-opacity">
                         Read Full Profile <span className="ml-2 text-lg">→</span>
                       </div>
-                      {item.lat && category === AppSection.TEMPLES && (
-                          <span className="text-xs text-gray-500 border border-slate-700 px-2 py-1 rounded flex items-center">
-                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd"></path></svg>
-                              Map
-                          </span>
-                      )}
                   </div>
                 </div>
               </div>
@@ -231,20 +198,8 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
             {isLoading && renderSkeleton(3)}
           </div>
       ) : (
-          /* MAP VIEW - ONLY FOR TEMPLES */
-          <div className="w-full h-[600px] rounded-xl border border-slate-700 overflow-hidden bg-slate-900 relative shadow-2xl animate-fade-in">
+          <div className="w-full h-[600px] rounded-xl border border-white/10 overflow-hidden bg-slate-900 relative shadow-2xl animate-fade-in">
               <div ref={mapRef} className="w-full h-full z-0"></div>
-              <div className="absolute bottom-4 left-4 bg-surface/80 backdrop-blur-md p-4 rounded-lg border border-slate-600 z-[1000] max-w-xs">
-                  <h4 className="font-bold text-primary mb-1">Interactive Map</h4>
-                  <p className="text-xs text-gray-300">Explore locations geographically. Click markers to view details.</p>
-              </div>
-          </div>
-      )}
-      
-      {/* Load More / Empty State */}
-      {!isLoading && items.length === 0 && !apiKeyMissing && (
-          <div className="text-center py-20 border border-dashed border-slate-700 rounded-2xl bg-surface/30">
-             <p className="text-gray-500 font-serif text-lg">The archives are silent.</p>
           </div>
       )}
 
@@ -253,14 +208,9 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
               <button 
                 onClick={onLoadMore}
                 disabled={isLoadingMore}
-                className="px-8 py-3 bg-surface border border-slate-600 hover:border-primary text-gray-300 hover:text-primary rounded-full transition-all duration-300 font-semibold tracking-wide disabled:opacity-50"
+                className="px-8 py-3 bg-white/5 border border-white/10 hover:border-primary text-gray-300 hover:text-primary rounded-full transition-all duration-300 font-semibold tracking-wide disabled:opacity-50 hover:bg-white/10 backdrop-blur-sm"
               >
-                {isLoadingMore ? (
-                    <span className="flex items-center">
-                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2"></span>
-                        Discovering more...
-                    </span>
-                ) : "Load More from Archives"}
+                {isLoadingMore ? "Discovering more..." : "Load More from Archives"}
               </button>
           </div>
       )}

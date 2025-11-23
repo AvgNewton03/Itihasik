@@ -73,7 +73,7 @@ export const generateHistoryResponse = async (prompt: string): Promise<{ text: s
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `User Query: ${prompt}. Answer as Itihasik, an Indian historian. Keep it under 100 words. No markdown. End with ||IMG|| followed by a 5-word visual description of the subject.`,
+      contents: `User Query: ${prompt}. Answer as Itihasik, an Indian historian. Keep it under 80 words for quick reading. No markdown. End with ||IMG|| followed by a 5-word visual description of the subject.`,
     });
 
     const fullText = response.text || "I could not find information on that.";
@@ -94,9 +94,8 @@ export const generateHistoryResponse = async (prompt: string): Promise<{ text: s
   }
 };
 
-// Improved Location Fetching - Prioritizes simple JSON retrieval over Tools for reliability
+// Improved Location Fetching
 export const getTopicLocation = async (topic: string): Promise<{ name: string; googleMapsUri: string; lat?: number; lng?: number } | undefined> => {
-    // Check Fallback data first to save API calls and ensure speed
     const knownLocation = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title.toLowerCase().includes(topic.toLowerCase()) || topic.toLowerCase().includes(i.title.toLowerCase()));
     if (knownLocation && knownLocation.lat) {
         return {
@@ -110,7 +109,6 @@ export const getTopicLocation = async (topic: string): Promise<{ name: string; g
     if (!isGeminiConfigured()) return undefined;
 
     try {
-        // STRATEGY 1: Direct JSON Request (Most reliable for coordinates)
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
             contents: `Return JSON only: { "lat": number, "lng": number, "placeName": string } for the exact location of "${topic}". If mythological/unknown, use the most famous temple location for it.`,
@@ -136,7 +134,6 @@ export const getTopicLocation = async (topic: string): Promise<{ name: string; g
 };
 
 export const generateTopicDetails = async (topic: string): Promise<TopicDetailData | null> => {
-  // Helper for fallback data
   const getFallback = () => {
     const fallbackItem = [...FALLBACK_TEMPLES, ...FALLBACK_GODS, ...FALLBACK_TEXTS].find(i => i.title === topic || topic.includes(i.title) || i.title.includes(topic));
      if (fallbackItem) {
@@ -153,7 +150,6 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
      return null;
   };
 
-  // Check for fallback match first if API key is missing
   if (!isGeminiConfigured()) {
      return getFallback();
   }
@@ -181,18 +177,15 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
 
   } catch (error) {
     console.error("Error fetching topic details (Quota/Network)", error);
-    // RETURN FALLBACK ON ERROR (QUOTA EXCEEDED)
     return getFallback();
   }
 };
 
 export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TEXTS', excludeNames: string[] = []): Promise<any[]> => {
-  // 1. If API is missing, return static fallback data immediately.
   if (!isGeminiConfigured()) {
       console.log("Using Fallback Data (No API Key)");
       const dataMap = { 'TEMPLES': FALLBACK_TEMPLES, 'GODS': FALLBACK_GODS, 'TEXTS': FALLBACK_TEXTS };
       const allItems = dataMap[category];
-      // Filter out excluded
       const newItems = allItems.filter(i => !excludeNames.includes(i.title));
       
       return newItems.map(item => ({
@@ -201,7 +194,6 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
       }));
   }
 
-  // 2. Attempt to fetch from API
   try {
     const excludeStr = excludeNames.length > 0 ? `Exclude: ${excludeNames.join(', ')}.` : "";
     const prompts = {
@@ -229,7 +221,6 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
 
   } catch (error) {
     console.warn("API Fetch failed, using fallback data", error);
-    // 3. If API fails (Quota/Network), Return Fallback Data silently so user sees content
     const dataMap = { 'TEMPLES': FALLBACK_TEMPLES, 'GODS': FALLBACK_GODS, 'TEXTS': FALLBACK_TEXTS };
     const fallbackItems = dataMap[category].filter(i => !excludeNames.includes(i.title));
     
@@ -241,19 +232,28 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
 }
 
 let audioContext: AudioContext | null = null;
+let currentSource: AudioBufferSourceNode | null = null;
 
-export const playTextToSpeech = async (text: string): Promise<void> => {
+export const stopTextToSpeech = () => {
+    if (currentSource) {
+        try { currentSource.stop(); } catch(e) {}
+        currentSource = null;
+    }
+    if (audioContext) {
+        try { audioContext.close(); } catch(e) {}
+        audioContext = null;
+    }
+};
+
+export const playTextToSpeech = async (text: string, onEnd?: () => void): Promise<void> => {
   if (!isGeminiConfigured()) return;
 
-  if (audioContext) {
-      try { await audioContext.close(); } catch (e) {}
-      audioContext = null;
-  }
+  stopTextToSpeech();
 
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: text.substring(0, 400) }] }], // Limit length for reliability
+      contents: [{ parts: [{ text: text.substring(0, 400) }] }], // Chunk text for speed
       config: {
         responseModalities: [Modality.AUDIO],
         speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Fenrir' } } },
@@ -270,9 +270,17 @@ export const playTextToSpeech = async (text: string): Promise<void> => {
     const source = audioContext.createBufferSource();
     source.buffer = validBuffer;
     source.connect(audioContext.destination);
+    
+    source.onended = () => {
+        if (onEnd) onEnd();
+        currentSource = null;
+    };
+    
+    currentSource = source;
     source.start();
 
   } catch (error) {
     console.error("TTS Error:", error);
+    if (onEnd) onEnd();
   }
 };

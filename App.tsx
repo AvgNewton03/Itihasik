@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navigation } from './components/Navigation';
 import { QuickStories } from './components/QuickStories';
 import { SectionGrid } from './components/SectionGrid';
@@ -30,12 +30,27 @@ function App() {
   const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
   const [isConfigured, setIsConfigured] = useState<boolean>(true);
 
+  // Cursor Ref
+  const cursorRef = useRef<HTMLDivElement>(null);
+
+  // Cursor Effect
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (cursorRef.current) {
+        cursorRef.current.style.left = `${e.clientX}px`;
+        cursorRef.current.style.top = `${e.clientY}px`;
+      }
+    };
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => window.removeEventListener('mousemove', handleMouseMove);
+  }, []);
+
   // Check configuration on mount
   useEffect(() => {
       setIsConfigured(isGeminiConfigured());
   }, []);
 
-  // Load data when section changes if not already loaded
+  // Load data
   useEffect(() => {
     const loadSectionData = async () => {
       if (!isGeminiConfigured()) return;
@@ -90,8 +105,12 @@ function App() {
   };
 
   const handleBackToArchive = () => {
-    setViewMode('LIST');
-    setSelectedItem(null);
+    if (viewMode === 'DETAIL') {
+      setViewMode('LIST');
+      setSelectedItem(null);
+    } else if (currentSection === AppSection.CHAT) {
+      setCurrentSection(AppSection.HOME);
+    }
   };
 
   const handleLoadMore = async () => {
@@ -124,6 +143,9 @@ function App() {
     setIsLoadingMore(false);
   };
 
+  // Determine if Nav should be shown
+  const showNav = currentSection !== AppSection.CHAT && viewMode !== 'DETAIL';
+
   const renderContent = () => {
     if (viewMode === 'DETAIL' && selectedItem) {
       return (
@@ -141,7 +163,7 @@ function App() {
         return (
           <div className="p-6 md:p-10 space-y-12 max-w-7xl mx-auto">
             {/* Hero Section */}
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[500px] group">
+            <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[500px] group border border-white/10">
               <img 
                 src="https://image.pollinations.ai/prompt/ancient%20indian%20temple%20sunset%20river%20ganga%20cinematic%20photorealistic%208k?width=1200&height=600&nologo=true" 
                 alt="Hero" 
@@ -166,22 +188,22 @@ function App() {
             
             {/* Feature Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <div onClick={() => handleSectionChange(AppSection.TEMPLES)} className="bg-surface p-8 rounded-2xl border border-slate-700 cursor-pointer hover:border-primary hover:-translate-y-2 transition-all duration-300 group">
-                <div className="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+              <div onClick={() => handleSectionChange(AppSection.TEMPLES)} className="glass-card p-8 rounded-2xl cursor-pointer hover:border-primary/50 hover:-translate-y-2 transition-all duration-300 group">
+                <div className="w-14 h-14 bg-slate-900/50 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors border border-white/5">
                   <span className="text-3xl group-hover:scale-110 transition-transform">🛕</span>
                 </div>
                 <h3 className="text-2xl font-serif font-bold text-gray-100 group-hover:text-primary transition-colors">Sacred Temples</h3>
                 <p className="text-gray-400 mt-3 leading-relaxed">Discover the architectural marvels and the science behind ancient stones.</p>
               </div>
-              <div onClick={() => handleSectionChange(AppSection.GODS)} className="bg-surface p-8 rounded-2xl border border-slate-700 cursor-pointer hover:border-primary hover:-translate-y-2 transition-all duration-300 group">
-                 <div className="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+              <div onClick={() => handleSectionChange(AppSection.GODS)} className="glass-card p-8 rounded-2xl cursor-pointer hover:border-primary/50 hover:-translate-y-2 transition-all duration-300 group">
+                 <div className="w-14 h-14 bg-slate-900/50 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors border border-white/5">
                   <span className="text-3xl group-hover:scale-110 transition-transform">🕉️</span>
                 </div>
                 <h3 className="text-2xl font-serif font-bold text-gray-100 group-hover:text-primary transition-colors">Deities & Avatars</h3>
                 <p className="text-gray-400 mt-3 leading-relaxed">Explore the pantheon of gods, their origins, and their stories.</p>
               </div>
-              <div onClick={() => handleSectionChange(AppSection.TEXTS)} className="bg-surface p-8 rounded-2xl border border-slate-700 cursor-pointer hover:border-primary hover:-translate-y-2 transition-all duration-300 group">
-                 <div className="w-14 h-14 bg-slate-900 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors">
+              <div onClick={() => handleSectionChange(AppSection.TEXTS)} className="glass-card p-8 rounded-2xl cursor-pointer hover:border-primary/50 hover:-translate-y-2 transition-all duration-300 group">
+                 <div className="w-14 h-14 bg-slate-900/50 rounded-full flex items-center justify-center mb-6 group-hover:bg-primary/20 transition-colors border border-white/5">
                   <span className="text-3xl group-hover:scale-110 transition-transform">📜</span>
                 </div>
                 <h3 className="text-2xl font-serif font-bold text-gray-100 group-hover:text-primary transition-colors">Ancient Texts</h3>
@@ -198,8 +220,8 @@ function App() {
         return <SectionGrid title="Wisdom Scrolls" items={textsData} onItemClick={handleItemClick} isLoading={isLoadingData} onLoadMore={handleLoadMore} isLoadingMore={isLoadingMore} category={AppSection.TEXTS} apiKeyMissing={!isConfigured} />;
       case AppSection.CHAT:
         return (
-            <div className="p-4 h-full">
-                <AIChat key={searchInitialQuery} initialQuery={searchInitialQuery} />
+            <div className="h-full">
+                <AIChat key={searchInitialQuery} initialQuery={searchInitialQuery} onBack={handleBackToArchive} />
             </div>
         );
       default:
@@ -208,21 +230,24 @@ function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background font-sans text-gray-200 overflow-hidden">
-      <Navigation 
-        currentSection={currentSection} 
-        onSectionChange={handleSectionChange}
-        onSearch={handleSearch}
-      />
+    <div className="flex flex-col h-screen bg-background font-sans text-gray-200 overflow-hidden relative">
+      <div ref={cursorRef} className="cursor-glow hidden md:block" />
+
+      {showNav && (
+        <Navigation 
+          currentSection={currentSection} 
+          onSectionChange={handleSectionChange}
+          onSearch={handleSearch}
+        />
+      )}
       
       <main className="flex flex-1 overflow-hidden relative">
-        {/* Main Content Area */}
         <div className="flex-1 overflow-y-auto relative scrollbar-thin">
            {renderContent()}
         </div>
 
         {/* Right Sidebar - Quick Stories (Hidden in Detail View and Chat) */}
-        {currentSection !== AppSection.CHAT && viewMode === 'LIST' && (
+        {showNav && viewMode === 'LIST' && (
              <QuickStories stories={STORIES} onReadStory={handleReadStory} />
         )}
       </main>
