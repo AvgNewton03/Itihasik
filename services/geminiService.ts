@@ -1,7 +1,7 @@
 
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { decodeBase64, decodeAudioData } from "./audioUtils";
-import { TopicDetailData } from "../types";
+import { TopicDetailData, SectionItem } from "../types";
 
 const API_KEY = process.env.API_KEY || '';
 
@@ -73,7 +73,7 @@ export const generateHistoryResponse = async (prompt: string): Promise<{ text: s
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `User Query: ${prompt}. Answer as Itihasik, an Indian historian. Keep it under 80 words for quick reading. No markdown. End with ||IMG|| followed by a 5-word visual description of the subject.`,
+      contents: `User Query: ${prompt}. Answer as Itihasik, an Indian historian. Keep it under 60 words. No markdown. End with ||IMG|| followed by a 5-word visual description.`,
     });
 
     const fullText = response.text || "I could not find information on that.";
@@ -88,7 +88,7 @@ export const generateHistoryResponse = async (prompt: string): Promise<{ text: s
   } catch (error) {
     console.warn("Gemini Chat Error (Quota/Network):", error);
     return { 
-        text: "The archives are experiencing high traffic (Quota Exceeded). I can currently only guide you through our preserved records in the Temples, Gods, and Texts sections.", 
+        text: "The archives are experiencing high traffic. I can currently only guide you through our preserved records in the Temples, Gods, and Texts sections.", 
         imagePrompt: "" 
     };
   }
@@ -111,7 +111,7 @@ export const getTopicLocation = async (topic: string): Promise<{ name: string; g
     try {
         const response = await ai.models.generateContent({
             model: "gemini-2.5-flash",
-            contents: `Return JSON only: { "lat": number, "lng": number, "placeName": string } for the exact location of "${topic}". If mythological/unknown, use the most famous temple location for it.`,
+            contents: `JSON only: { "lat": number, "lng": number, "placeName": string } for location of "${topic}".`,
             config: { responseMimeType: "application/json" }
         });
         
@@ -142,8 +142,8 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
              subtitle: "Offline Archive Record",
              heroImagePrompt: fallbackItem.imageSearchTerm || fallbackItem.title,
              introduction: fallbackItem.description,
-             sections: [{ title: "Overview", content: fallbackItem.description + "\n\n(Note: Full detailed history is currently unavailable due to high server traffic or missing API key. This is a summarized record from our local archives.)" }],
-             facts: ["This record is retrieved from local archives.", "The main knowledge library is currently busy."],
+             sections: [{ title: "Overview", content: fallbackItem.description + "\n\n(Note: Full detailed history is currently unavailable due to high server traffic. This is a summarized record.)" }],
+             facts: ["Record from local archives.", "Full details pending restoration."],
              galleryPrompts: [fallbackItem.title + " architecture", fallbackItem.title + " close up", "Ancient India Art"]
          };
      }
@@ -158,7 +158,7 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
     const contentResponse = await ai.models.generateContent({
       model: "gemini-2.5-flash",
       contents: `Profile for "${topic}" (Ancient India). JSON format.
-      Fields: title, subtitle, heroImagePrompt (visual keywords only), introduction (2 sentences), sections (array of {title, content}), facts (array of strings), galleryPrompts (array of 3 visual strings).`,
+      Fields: title, subtitle, heroImagePrompt (visual keywords), introduction (2 sentences), sections (array of {title, content}), facts (3 short strings), galleryPrompts (3 visual strings).`,
       config: { responseMimeType: "application/json" }
     });
 
@@ -176,14 +176,30 @@ export const generateTopicDetails = async (topic: string): Promise<TopicDetailDa
     };
 
   } catch (error) {
-    console.error("Error fetching topic details (Quota/Network)", error);
+    console.error("Error fetching topic details", error);
     return getFallback();
   }
 };
 
 export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TEXTS', excludeNames: string[] = []): Promise<any[]> => {
+  // 1. Check Caching (LocalStorage) for initial loads
+  const CACHE_KEY = `itihasik_cache_${category}_v2`; // Bump version for prompt changes
+  if (excludeNames.length === 0) {
+      try {
+          const cached = localStorage.getItem(CACHE_KEY);
+          if (cached) {
+              const parsed = JSON.parse(cached);
+              // Simple validity check
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                  return parsed;
+              }
+          }
+      } catch (e) {
+          console.warn("Cache access error", e);
+      }
+  }
+
   if (!isGeminiConfigured()) {
-      console.log("Using Fallback Data (No API Key)");
       const dataMap = { 'TEMPLES': FALLBACK_TEMPLES, 'GODS': FALLBACK_GODS, 'TEXTS': FALLBACK_TEXTS };
       const allItems = dataMap[category];
       const newItems = allItems.filter(i => !excludeNames.includes(i.title));
@@ -197,9 +213,9 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
   try {
     const excludeStr = excludeNames.length > 0 ? `Exclude: ${excludeNames.join(', ')}.` : "";
     const prompts = {
-      TEMPLES: `List 6 famous ancient Indian temples. ${excludeStr} JSON Array. Fields: id, title, description, imageSearchTerm (visual keywords), tags, lat, lng.`,
-      GODS: `List 6 Hindu gods/goddesses. ${excludeStr} JSON Array. Fields: id, title, description, imageSearchTerm, tags, lat (of main temple), lng.`,
-      TEXTS: `List 6 ancient Indian texts. ${excludeStr} JSON Array. Fields: id, title, description, imageSearchTerm, tags, lat (origin/museum), lng.`
+      TEMPLES: `List 6 ancient Indian temples. ${excludeStr} JSON: [{id, title, description, imageSearchTerm (visual keywords), tags, lat, lng}].`,
+      GODS: `List 6 Hindu gods. ${excludeStr} JSON: [{id, title, description, imageSearchTerm, tags, lat (temple location), lng}].`,
+      TEXTS: `List 6 ancient Indian texts. ${excludeStr} JSON: [{id, title, description, imageSearchTerm, tags, lat, lng}].`
     };
 
     const response = await ai.models.generateContent({
@@ -214,10 +230,21 @@ export const fetchDynamicSectionData = async (category: 'TEMPLES' | 'GODS' | 'TE
     if (!Array.isArray(data) && data.items) data = data.items;
     if (!Array.isArray(data)) data = [];
     
-    return data.map((item: any) => ({
+    const mappedData = data.map((item: any) => ({
       ...item,
       imageUrl: `https://image.pollinations.ai/prompt/${encodeURIComponent((item.imageSearchTerm || item.title) + " " + BASE_IMAGE_PROMPT)}?width=600&height=400&nologo=true&seed=${Math.random()}`
     }));
+
+    // Save to cache if this is an initial load
+    if (excludeNames.length === 0 && mappedData.length > 0) {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify(mappedData));
+        } catch (e) {
+            console.warn("Failed to cache data", e);
+        }
+    }
+
+    return mappedData;
 
   } catch (error) {
     console.warn("API Fetch failed, using fallback data", error);

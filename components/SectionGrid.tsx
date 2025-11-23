@@ -39,6 +39,16 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
       }
   }, [category]);
 
+  // Scroll to top when switching to Map view
+  useEffect(() => {
+    if (viewType === 'MAP' && mapRef.current) {
+        const scrollParent = mapRef.current.closest('.overflow-y-auto');
+        if (scrollParent) {
+            scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    }
+  }, [viewType]);
+
   useEffect(() => {
       if (viewType === 'MAP' && !isLoading && items.length > 0 && mapRef.current) {
           if (!mapInstanceRef.current && window.L) {
@@ -55,9 +65,9 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
                       const marker = window.L.marker([item.lat, item.lng])
                         .addTo(map)
                         .bindPopup(`
-                            <div class="text-center text-slate-900">
-                                <b class="text-sm font-bold">${item.title}</b><br/>
-                                <button id="popup-${item.id}" class="mt-2 text-xs bg-blue-600 text-white px-2 py-1 rounded">Explore</button>
+                            <div class="text-center text-slate-900 min-w-[150px]">
+                                <b class="text-sm font-bold font-serif">${item.title}</b><br/>
+                                <button id="popup-${item.id}" class="mt-2 text-xs bg-amber-600 text-white px-3 py-1.5 rounded-full font-bold">Explore</button>
                             </div>
                         `);
                         
@@ -117,33 +127,38 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
       );
   }
 
+  // Layout changes based on View Type
   return (
-    <div className="p-6 md:p-10 max-w-7xl mx-auto pb-20">
-      <div className="mb-12 flex flex-col md:flex-row justify-between items-end md:items-center border-b border-white/10 pb-6">
-        <div>
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-gray-100 mb-2 tracking-tight">{title}</h2>
-            <p className="text-text-muted text-sm uppercase tracking-widest">
-                {isLoading ? "Unearthing ancient secrets..." : `Found ${items.length} Records`}
-            </p>
-        </div>
-        
-        {!isLoading && items.length > 0 && category === AppSection.TEMPLES && (
-            <div className="flex space-x-2 bg-slate-900/50 p-1 rounded-lg border border-white/10 mt-4 md:mt-0 backdrop-blur-md">
-                <button 
-                    onClick={() => setViewType('GRID')}
-                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${viewType === 'GRID' ? 'bg-primary text-slate-900 shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                >
-                    Grid View
-                </button>
-                <button 
-                    onClick={() => setViewType('MAP')}
-                    className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${viewType === 'MAP' ? 'bg-primary text-slate-900 shadow-lg' : 'text-gray-400 hover:text-white'}`}
-                >
-                    Map View
-                </button>
+    <div className={viewType === 'MAP' ? "w-full h-[calc(100vh-5rem)] relative bg-slate-900" : "p-6 md:p-10 max-w-7xl mx-auto pb-20"}>
+      
+      {/* HEADER: Only show standard header in Grid Mode */}
+      {viewType === 'GRID' && (
+        <div className="mb-12 flex flex-col md:flex-row justify-between items-end md:items-center border-b border-white/10 pb-6">
+            <div>
+                <h2 className="text-4xl md:text-5xl font-serif font-bold text-gray-100 mb-2 tracking-tight">{title}</h2>
+                <p className="text-text-muted text-sm uppercase tracking-widest">
+                    {isLoading ? "Unearthing ancient secrets..." : `Found ${items.length} Records`}
+                </p>
             </div>
-        )}
-      </div>
+            
+            {!isLoading && items.length > 0 && category === AppSection.TEMPLES && (
+                <div className="flex space-x-2 bg-slate-900/50 p-1 rounded-lg border border-white/10 mt-4 md:mt-0 backdrop-blur-md">
+                    <button 
+                        onClick={() => setViewType('GRID')}
+                        className="px-4 py-2 rounded-md text-sm font-bold transition-all bg-primary text-slate-900 shadow-lg"
+                    >
+                        Grid View
+                    </button>
+                    <button 
+                        onClick={() => setViewType('MAP')}
+                        className="px-4 py-2 rounded-md text-sm font-bold transition-all text-gray-400 hover:text-white"
+                    >
+                        Map View
+                    </button>
+                </div>
+            )}
+        </div>
+      )}
 
       {viewType === 'GRID' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 animate-fade-in">
@@ -198,8 +213,30 @@ export const SectionGrid: React.FC<SectionGridProps> = ({
             {isLoading && renderSkeleton(3)}
           </div>
       ) : (
-          <div className="w-full h-[600px] rounded-xl border border-white/10 overflow-hidden bg-slate-900 relative shadow-2xl animate-fade-in">
+          <div className="w-full h-full relative animate-fade-in">
               <div ref={mapRef} className="w-full h-full z-0"></div>
+              
+              {/* Floating Overlay for Map Mode */}
+              <div className="absolute top-4 left-4 right-4 md:left-6 md:w-80 z-[400] glass-panel p-4 rounded-xl flex flex-col gap-3 animate-fade-in border-slate-700/50 shadow-2xl">
+                  <div>
+                    <h2 className="text-xl font-serif font-bold text-white shadow-black drop-shadow-md">{title}</h2>
+                     <p className="text-xs text-gray-400">Interactive Geo-Archive</p>
+                  </div>
+                  <div className="flex bg-slate-900/80 p-1 rounded-lg border border-white/10">
+                        <button 
+                            onClick={() => setViewType('GRID')} 
+                            className="flex-1 px-3 py-1.5 rounded-md text-xs font-bold text-gray-400 hover:text-white transition-all hover:bg-white/5"
+                        >
+                            Grid View
+                        </button>
+                        <button 
+                            onClick={() => setViewType('MAP')} 
+                            className="flex-1 px-3 py-1.5 rounded-md text-xs font-bold bg-primary text-slate-900 shadow-md"
+                        >
+                            Map View
+                        </button>
+                  </div>
+              </div>
           </div>
       )}
 
