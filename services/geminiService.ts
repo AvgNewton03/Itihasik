@@ -3,16 +3,21 @@ import { decodeBase64, decodeAudioData } from "./audioUtils";
 import { TopicDetailData, SectionItem } from "../types";
 
 const API_KEY = (() => {
-  let key = "";
+  let key: string | undefined = "";
+  
+  // 1. Prioritize Vite env variables (Vite statically replaces these)
   try {
-    const env = (import.meta as any)?.env;
-    key = env?.VITE_GEMINI_API_KEY || env?.VITE_API_KEY;
+    if (import.meta && (import.meta as any).env) {
+      key = (import.meta as any).env.VITE_GEMINI_API_KEY || (import.meta as any).env.VITE_API_KEY;
+    }
   } catch (e) {}
 
+  // 2. Fallback to process.env for standard Node environments
   if (!key) {
     try {
-      const p = (process as any)?.env;
-      key = p?.VITE_GEMINI_API_KEY || p?.API_KEY || p?.GEMINI_API_KEY;
+      if (typeof process !== "undefined" && process.env) {
+        key = process.env.VITE_GEMINI_API_KEY || process.env.API_KEY || process.env.GEMINI_API_KEY;
+      }
     } catch (e) {}
   }
 
@@ -225,7 +230,7 @@ export const generateHistoryResponse = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: `User Query: ${prompt}. Answer as Itihasik, an Indian historian. Keep it under 60 words. No markdown. End with ||IMG|| followed by a 5-word visual description.`,
     });
 
@@ -280,7 +285,7 @@ export const getTopicLocation = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: `JSON only: { "lat": number, "lng": number, "placeName": string } for location of "${topic}".`,
       config: { responseMimeType: "application/json" },
     });
@@ -349,7 +354,7 @@ export const generateTopicDetails = async (
 
   try {
     const contentResponse = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: `Profile for "${topic}" (Ancient India). JSON format.
       Fields: title, subtitle, heroImagePrompt (visual keywords), introduction (2 sentences), sections (array of {title, content}), facts (3 short strings), galleryPrompts (3 visual strings).`,
       config: { responseMimeType: "application/json" },
@@ -423,7 +428,7 @@ export const fetchDynamicSectionData = async (
     };
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       contents: prompts[category],
       config: { responseMimeType: "application/json" },
     });
@@ -499,7 +504,7 @@ export const playTextToSpeech = async (
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-1.5-flash",
       contents: [{ parts: [{ text: text.substring(0, 400) }] }], // Chunk text for speed
       config: {
         responseModalities: [Modality.AUDIO],
